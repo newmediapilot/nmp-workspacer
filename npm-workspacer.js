@@ -163,7 +163,7 @@ checkAndAddWorkspaces();
                     reject(error);
                 } else {
                     log(chalk.green(`📦 createPackageJson :: Successfully created package.json in ${folder}`));
-                    await delay(2000); // Wait for 2 seconds
+                    await delay(5000); // 5-second delay after the success message
                     resolve();
                 }
             });
@@ -185,14 +185,13 @@ checkAndAddWorkspaces();
                 const repositoryName = path.basename(folder); // Get the repository name from the folder
 
                 commandList.forEach(command => {
-                    const commandKey = `npm-workspacer:${command}`;
+                    const commandKey = `${repositoryName}:${command} --workspace sites`; // Added space here
                     if (!packageJson.scripts) {
                         packageJson.scripts = {};
                     }
 
                     // Modify the script command to use a relative path (./packages/*)
-                    packageJson.scripts[commandKey] = `echo ${repositoryName} :: ${commandKey}`;
-
+                    packageJson.scripts[commandKey] = `npm run ${repositoryName}:${command} --workspace sites`;  // Added space here
                 });
 
                 fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
@@ -226,7 +225,7 @@ checkAndAddWorkspaces();
             const packageJson = require(rootPackageJsonPath);
 
             commands.forEach(command => {
-                packageJson.scripts[command] = `npm run ${prefix}:${command} -w ./packages/*`;  // Use relative path here
+                packageJson.scripts[command] = `npm run ${prefix}:${command} --workspace sites`;  // Use relative path here
             });
 
             // Adding workspaces to the root package.json
