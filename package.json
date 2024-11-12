@@ -4,9 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "chmod 777 npm-workspacer.sh && bash npm-workspacer.sh"
+    "start": "node npm-workspacer.js",
+    "start:win": "powershell -NoProfile -Command \"node ./npm-workspacer.js\""
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "chalk": "^2.4.2",
+    "enquirer": "^2.4.1",
+    "prompt-sync": "^4.2.0",
+    "readline": "^1.3.0"
+  }
 }
