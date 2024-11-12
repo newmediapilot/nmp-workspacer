@@ -19,6 +19,11 @@
     "readline": "^1.3.0"
   },
   "workspaces": [
-    "packages/*"
+    "packages/augmented-reality",
+    "packages/design-patterns-js",
+    "packages/dice-wod",
+    "packages/grid-testing",
+    "packages/mastering-react-course",
+    "packages/nmp-ai-cyclops"
   ]
 }
