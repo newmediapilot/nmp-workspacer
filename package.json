@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "rm -rf packages && node npm-workspacer.js",
-    "echo": "npm run npm-workspacer:echo -w /packages/*",
-    "delta": "npm run npm-workspacer:delta -w /packages/*",
-    "tango": "npm run npm-workspacer:tango -w /packages/*"
+    "build": "npm run npm-workspacer:build -w ./packages/*",
+    "test": "npm run npm-workspacer:test -w ./packages/*",
+    "deploy": "npm run npm-workspacer:deploy -w ./packages/*"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +17,8 @@
     "enquirer": "^2.4.1",
     "prompt-sync": "^4.2.0",
     "readline": "^1.3.0"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

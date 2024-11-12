@@ -5,12 +5,18 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk'); // Use CommonJS require for chalk
 
+// Helper function to log messages with time and step details
+const log = (message) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${message}`);
+};
+
 // Get the current Git username, if available
 let defaultUsername = '';
 try {
     defaultUsername = execSync('git config user.name').toString().trim();
 } catch (error) {
-    console.log(chalk.red('🚲 getGitHubUsername :: Error: No Git username found in the current configuration.'));
+    log(chalk.red('🚲 getGitHubUsername :: Error: No Git username found in the current configuration.'));
 }
 
 // Prompt for GitHub username with a default value
@@ -52,15 +58,15 @@ const selectRepositories = async (repoUrls) => {
 
 const cloneRepository = (url, targetDir) => {
     return new Promise((resolve, reject) => {
-        console.log(chalk.blue(`🚲 cloneRepository :: Cloning ${url} into ${targetDir}...`));
+        log(chalk.blue(`🚲 cloneRepository :: Cloning ${url} into ${targetDir}...`));
 
         if (fs.existsSync(targetDir)) {
-            console.log(chalk.yellow(`🚲 cloneRepository :: Directory ${targetDir} already exists, updating with git fetch and git pull.`));
+            log(chalk.yellow(`🚲 cloneRepository :: Directory ${targetDir} already exists, updating with git fetch and git pull.`));
             exec(`git -C ${targetDir} fetch && git -C ${targetDir} pull`, (error, stdout, stderr) => {
                 if (error) {
                     reject(chalk.red(`🚲 cloneRepository :: Error updating ${url}: ${stderr}`));
                 } else {
-                    console.log(chalk.green(`🚲 cloneRepository :: Successfully updated ${url}`));
+                    log(chalk.green(`🚲 cloneRepository :: Successfully updated ${url}`));
                     resolve();
                 }
             });
@@ -69,7 +75,7 @@ const cloneRepository = (url, targetDir) => {
                 if (error) {
                     reject(chalk.red(`🚲 cloneRepository :: Error cloning ${url}: ${stderr}`));
                 } else {
-                    console.log(chalk.green(`🚲 cloneRepository :: Successfully cloned ${url}`));
+                    log(chalk.green(`🚲 cloneRepository :: Successfully cloned ${url}`));
                     resolve();
                 }
             });
@@ -90,7 +96,7 @@ const promptForPrefix = async (defaultPrefix) => {
 
 const scanForMissingPackageJson = () => {
     const packagesDir = path.join(__dirname, 'packages');
-    console.log(chalk.blue(`🔍 scanForMissingPackageJson :: Scanning ${packagesDir} for missing package.json files...`));
+    log(chalk.blue(`🔍 scanForMissingPackageJson :: Scanning ${packagesDir} for missing package.json files...`));
     const folders = fs.readdirSync(packagesDir).filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory());
 
     const missingPackageJson = folders.filter((folder) => !fs.existsSync(path.join(packagesDir, folder, 'package.json')));
@@ -100,13 +106,51 @@ const scanForMissingPackageJson = () => {
 
 const createPackageJson = (folder) => {
     const targetDir = path.join(__dirname, 'packages', folder);
-    console.log(chalk.blue(`📦 createPackageJson :: Creating package.json in ${targetDir}...`));
+    log(chalk.blue(`📦 createPackageJson :: Creating package.json in ${targetDir}...`));
 
-    exec(`npm init -y`, { cwd: targetDir }, (error, stdout, stderr) => {
-        if (error) {
-            console.error(chalk.red(`📦 createPackageJson :: Error creating package.json in ${folder}: ${stderr}`));
+    return new Promise((resolve, reject) => {
+        exec(`npm init -y`, { cwd: targetDir }, async (error, stdout, stderr) => {
+            if (error) {
+                log(chalk.red(`📦 createPackageJson :: Error creating package.json in ${folder}: ${stderr}`));
+                reject(error);
+            } else {
+                log(chalk.green(`📦 createPackageJson :: Successfully created package.json in ${folder}`));
+                await delay(2000); // Wait for 2 seconds
+                resolve();
+            }
+        });
+    });
+};
+
+const delay = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms)); // Delay for given milliseconds
+};
+
+const addCommandsToPackageJson = (commandList) => {
+    const packagesDir = path.join(__dirname, 'packages');
+    const folders = fs.readdirSync(packagesDir).filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory());
+
+    folders.forEach(folder => {
+        const packageJsonPath = path.join(packagesDir, folder, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+            const packageJson = require(packageJsonPath);
+            const repositoryName = path.basename(folder); // Get the repository name from the folder
+
+            commandList.forEach(command => {
+                const commandKey = `npm-workspacer:${command}`;
+                if (!packageJson.scripts) {
+                    packageJson.scripts = {};
+                }
+
+                // Modify the script command to use a relative path (./packages/*)
+                packageJson.scripts[commandKey] = `echo ${repositoryName} :: ${commandKey}`;
+
+            });
+
+            fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+            log(chalk.green(`🚚 addCommandsToPackageJson :: Added commands to ${folder}/package.json`));
         } else {
-            console.log(chalk.green(`📦 createPackageJson :: Successfully created package.json in ${folder}`));
+            log(chalk.red(`🚚 addCommandsToPackageJson :: package.json not found in ${folder}, skipping.`));
         }
     });
 };
@@ -118,10 +162,11 @@ const promptForCommands = async () => {
             type: 'input',
             name: 'commands',
             message: 'List the commands you would like to create, delimited by comma (e.g., build, test, deploy):',
+            initial: 'build, test, deploy'  // Set default value
         });
         commands = response.commands.trim();
         if (!commands) {
-            console.log(chalk.red('🚛 promptForCommands :: No commands entered, please try again.'));
+            log(chalk.red('🚛 promptForCommands :: No commands entered, please try again.'));
         }
     }
     return commands.split(',').map(cmd => cmd.trim());
@@ -133,20 +178,25 @@ const updateRootPackageJson = (commands, prefix) => {
         const packageJson = require(rootPackageJsonPath);
 
         commands.forEach(command => {
-            packageJson.scripts[command] = `npm run ${prefix}:${command} -w /packages/*`;
+            packageJson.scripts[command] = `npm run ${prefix}:${command} -w ./packages/*`;  // Use relative path here
         });
 
+        // Adding workspaces to the root package.json
+        packageJson.workspaces = [
+            "packages/*"
+        ];
+
         fs.writeFileSync(rootPackageJsonPath, JSON.stringify(packageJson, null, 2));
-        console.log(chalk.green(`🚛 updateRootPackageJson :: Updated package.json with commands.`));
+        log(chalk.green(`🚛 updateRootPackageJson :: Updated package.json with commands and workspaces.`));
     } else {
-        console.log(chalk.red('🚛 updateRootPackageJson :: root package.json not found.'));
+        log(chalk.red('🚛 updateRootPackageJson :: root package.json not found.'));
     }
 };
 
 (async () => {
     const githubUsername = await getGitHubUsername();
     if (!githubUsername) {
-        console.log(chalk.red('🚲 getGitHubUsername :: Error: No username provided and no default Git username found.'));
+        log(chalk.red('🚲 getGitHubUsername :: Error: No username provided and no default Git username found.'));
         process.exit(1);
     }
 
@@ -158,7 +208,7 @@ const updateRootPackageJson = (commands, prefix) => {
             let selectedUrls = await selectRepositories(repoUrls);
 
             if (selectedUrls.length === 0) {
-                console.log(chalk.red('🚲 selectRepositories :: No repositories selected, closing workspacer.'));
+                log(chalk.red('🚲 selectRepositories :: No repositories selected, closing workspacer.'));
                 return;
             }
 
@@ -173,11 +223,11 @@ const updateRootPackageJson = (commands, prefix) => {
                 await cloneRepository(url, targetDir);
             }
 
-            console.log();  // Line break after cloning
+            log();  // Line break after cloning
 
             const currentRepoName = path.basename(__dirname);
             const prefix = await promptForPrefix(currentRepoName);
-            console.log(chalk.green(`🚛 promptForPrefix :: Selected prefix for commands: ${prefix}`));
+            log(chalk.green(`🚛 promptForPrefix :: Selected prefix for commands: ${prefix}`));
 
             const missingPackageJson = scanForMissingPackageJson();
 
@@ -199,7 +249,7 @@ const updateRootPackageJson = (commands, prefix) => {
                     selectedFolders.forEach((folder) => createPackageJson(folder));
                 }
             } else {
-                console.log(chalk.green('🚛 createPackageJson :: All repositories already have a package.json file.'));
+                log(chalk.green('🚛 createPackageJson :: All repositories already have a package.json file.'));
             }
 
             // Prompt for the commands
@@ -208,10 +258,18 @@ const updateRootPackageJson = (commands, prefix) => {
             // Update the root package.json with the commands
             updateRootPackageJson(commands, prefix);
 
+            // Add commands to each package's package.json
+            addCommandsToPackageJson(commands);
+
+            // Log done for package.json modification
+            log(chalk.green('🚛 Done modifying package.json files in root and packages.'));
+
+            // Log done for workspaces
+            log(chalk.green('🚛 Done adding workspaces to root package.json.'));
         } else {
-            console.log(chalk.red('🚲 fetchRepositories :: No repositories found for user.'));
+            log(chalk.red('🚲 fetchRepositories :: No repositories found for user.'));
         }
     } catch (error) {
-        console.error(chalk.red(`🚲 main :: Error fetching repositories: ${error.message}`));
+        log(chalk.red(`🚲 main :: Error fetching repositories: ${error.message}`));
     }
 })();
