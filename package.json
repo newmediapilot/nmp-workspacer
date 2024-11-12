@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node npm-workspacer.js",
-    "start:win": "powershell -NoProfile -Command \"node ./npm-workspacer.js\""
+    "start": "rm -rf packages && node npm-workspacer.js"
   },
   "keywords": [],
   "author": "",

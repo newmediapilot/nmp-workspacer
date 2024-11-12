@@ -10,7 +10,7 @@ let defaultUsername = '';
 try {
     defaultUsername = execSync('git config user.name').toString().trim();
 } catch (error) {
-    console.log(chalk.red('>>>> Error: No Git username found in the current configuration.'));
+    console.log(chalk.red('🚲 getGitHubUsername :: Error: No Git username found in the current configuration.'));
 }
 
 // Prompt for GitHub username with a default value
@@ -34,7 +34,9 @@ const fetchRepositories = (username) => {
             res.on('data', (chunk) => data += chunk);
             res.on('end', () => resolve(JSON.parse(data)));
             res.on('error', reject);
-        }).on('error', reject);
+        }).on('error', (err) => {
+            reject(chalk.red(`🔍 fetchRepositories :: Error fetching repositories: ${err.message}`));
+        });
     });
 };
 
@@ -48,38 +50,31 @@ const selectRepositories = async (repoUrls) => {
     return response.selectedUrls;
 };
 
-const confirmCloneAll = async () => {
-    const response = await prompt({
-        type: 'confirm',
-        name: 'confirm',
-        message: 'Are you sure you want to clone all the repositories?'
-    });
-    return response.confirm;
-};
-
 const cloneRepository = (url, targetDir) => {
-    console.log(chalk.blue(`>>>> Cloning ${url} into ${targetDir}...`));
+    return new Promise((resolve, reject) => {
+        console.log(chalk.blue(`🚲 cloneRepository :: Cloning ${url} into ${targetDir}...`));
 
-    // Check if the directory exists
-    if (fs.existsSync(targetDir)) {
-        console.log(chalk.yellow(`>>>> Directory ${targetDir} already exists, updating with git fetch and git pull.`));
-        exec(`git -C ${targetDir} fetch && git -C ${targetDir} pull`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(chalk.red(`>>>> Error updating ${url}: ${stderr}`));
-            } else {
-                console.log(chalk.green(`>>>> Successfully updated ${url}`));
-            }
-        });
-    } else {
-        // Clone the repository if the directory does not exist
-        exec(`git clone ${url} ${targetDir}`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(chalk.red(`>>>> Error cloning ${url}: ${stderr}`));
-            } else {
-                console.log(chalk.green(`>>>> Successfully cloned ${url}`));
-            }
-        });
-    }
+        if (fs.existsSync(targetDir)) {
+            console.log(chalk.yellow(`🚲 cloneRepository :: Directory ${targetDir} already exists, updating with git fetch and git pull.`));
+            exec(`git -C ${targetDir} fetch && git -C ${targetDir} pull`, (error, stdout, stderr) => {
+                if (error) {
+                    reject(chalk.red(`🚲 cloneRepository :: Error updating ${url}: ${stderr}`));
+                } else {
+                    console.log(chalk.green(`🚲 cloneRepository :: Successfully updated ${url}`));
+                    resolve();
+                }
+            });
+        } else {
+            exec(`git clone ${url} ${targetDir}`, (error, stdout, stderr) => {
+                if (error) {
+                    reject(chalk.red(`🚲 cloneRepository :: Error cloning ${url}: ${stderr}`));
+                } else {
+                    console.log(chalk.green(`🚲 cloneRepository :: Successfully cloned ${url}`));
+                    resolve();
+                }
+            });
+        }
+    });
 };
 
 const promptForPrefix = async (defaultPrefix) => {
@@ -93,10 +88,33 @@ const promptForPrefix = async (defaultPrefix) => {
     return response.prefix || defaultPrefix;
 };
 
+const scanForMissingPackageJson = () => {
+    const packagesDir = path.join(__dirname, 'packages');
+    console.log(chalk.blue(`🔍 scanForMissingPackageJson :: Scanning ${packagesDir} for missing package.json files...`));
+    const folders = fs.readdirSync(packagesDir).filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory());
+
+    const missingPackageJson = folders.filter((folder) => !fs.existsSync(path.join(packagesDir, folder, 'package.json')));
+
+    return missingPackageJson;
+};
+
+const createPackageJson = (folder) => {
+    const targetDir = path.join(__dirname, 'packages', folder);
+    console.log(chalk.blue(`📦 createPackageJson :: Creating package.json in ${targetDir}...`));
+
+    exec(`npm init -y`, { cwd: targetDir }, (error, stdout, stderr) => {
+        if (error) {
+            console.error(chalk.red(`📦 createPackageJson :: Error creating package.json in ${folder}: ${stderr}`));
+        } else {
+            console.log(chalk.green(`📦 createPackageJson :: Successfully created package.json in ${folder}`));
+        }
+    });
+};
+
 (async () => {
     const githubUsername = await getGitHubUsername();
     if (!githubUsername) {
-        console.log(chalk.red('>>>> No username provided and no default Git username found.'));
+        console.log(chalk.red('🚲 getGitHubUsername :: Error: No username provided and no default Git username found.'));
         process.exit(1);
     }
 
@@ -107,42 +125,57 @@ const promptForPrefix = async (defaultPrefix) => {
 
             let selectedUrls = await selectRepositories(repoUrls);
 
-            // If no repositories are selected, confirm cloning all
             if (selectedUrls.length === 0) {
-                const confirmAll = await confirmCloneAll();
-                if (!confirmAll) {
-                    // Return to the repository selector if user declines
-                    selectedUrls = await selectRepositories(repoUrls);
-                } else {
-                    selectedUrls = repoUrls; // Set to all if confirmed
-                }
+                console.log(chalk.red('🚲 selectRepositories :: No repositories selected, closing workspacer.'));
+                return;
             }
 
-            // Ensure packages/ directory exists
             const packagesDir = path.join(__dirname, 'packages');
             if (!fs.existsSync(packagesDir)) {
                 fs.mkdirSync(packagesDir);
             }
 
-            // Clone or update each selected repository into packages/
             for (const url of selectedUrls) {
                 const repoName = path.basename(url, '.git');
                 const targetDir = path.join(packagesDir, repoName);
-                await new Promise((resolve) => {
-                    cloneRepository(url, targetDir);
-                    setTimeout(resolve, 2000); // Delay to allow each operation to complete
-                });
+                await cloneRepository(url, targetDir);
             }
 
-            // Prompt for command prefix
-            const currentRepoName = path.basename(__dirname);
-            const prefix = await promptForPrefix(currentRepoName);
-            console.log(chalk.green(`>>>> Selected prefix for commands: ${prefix}`));
+            // Add a line break after all clones are done
+            console.log();  // This adds a line break
 
+            setTimeout(async () => {
+                const currentRepoName = path.basename(__dirname);
+                const prefix = await promptForPrefix(currentRepoName);
+                console.log(chalk.green(`🚛 promptForPrefix :: Selected prefix for commands: ${prefix}`));
+
+                const missingPackageJson = scanForMissingPackageJson();
+
+                if (missingPackageJson.length > 0) {
+                    const response = await prompt({
+                        type: 'confirm',
+                        name: 'createPackageJson',
+                        message: 'Some repositories are missing package.json files. Would you like to create them?',
+                    });
+
+                    if (response.createPackageJson) {
+                        const { selectedFolders } = await prompt({
+                            type: 'multiselect',
+                            name: 'selectedFolders',
+                            message: 'Select the repositories to create package.json files for:',
+                            choices: missingPackageJson
+                        });
+
+                        selectedFolders.forEach((folder) => createPackageJson(folder));
+                    }
+                } else {
+                    console.log(chalk.green('🚛 createPackageJson :: All repositories already have a package.json file.'));
+                }
+            }, 5000);
         } else {
-            console.log(chalk.red(`>>>> No repositories found for user '${githubUsername}' or user does not exist.`));
+            console.log(chalk.red('🚲 fetchRepositories :: No repositories found for user.'));
         }
     } catch (error) {
-        console.error(chalk.red(`>>>> Error fetching repositories: ${error.message}`));
+        console.error(chalk.red(`🚲 main :: Error fetching repositories: ${error.message}`));
     }
 })();
