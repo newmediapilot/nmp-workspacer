@@ -15,6 +15,16 @@ const log = (message) => {
 const rootPackageJsonPath = path.join(__dirname, 'package.json');
 const packagesDir = path.join(__dirname, 'packages');
 
+// Function to delete and recreate the packages directory
+const deleteAndRecreatePackagesDir = () => {
+    if (fs.existsSync(packagesDir)) {
+        log(chalk.yellow(`🚮 Deleting existing packages directory: ${packagesDir}`));
+        fs.rmSync(packagesDir, { recursive: true, force: true });  // Using fs.rm instead of rmdir
+    }
+    log(chalk.blue(`🏗️ Recreating packages directory: ${packagesDir}`));
+    fs.mkdirSync(packagesDir);  // Recreate the directory
+};
+
 // Function to get all subdirectories in packages/ folder
 const getPackageFolders = () => {
     const folders = fs.readdirSync(packagesDir).filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory());
@@ -53,6 +63,9 @@ const checkAndAddWorkspaces = () => {
         process.exit(1);
     }
 };
+
+// Delete and recreate the ./packages/ directory before continuing
+deleteAndRecreatePackagesDir();
 
 // Run the check at the start of the script
 checkAndAddWorkspaces();
@@ -174,7 +187,7 @@ checkAndAddWorkspaces();
         return new Promise(resolve => setTimeout(resolve, ms)); // Delay for given milliseconds
     };
 
-    const addCommandsToPackageJson = (commandList) => {
+    const addCommandsToPackageJson = (commandList, rootRepositoryName) => {
         const packagesDir = path.join(__dirname, 'packages');
         const folders = fs.readdirSync(packagesDir).filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory());
 
@@ -185,13 +198,13 @@ checkAndAddWorkspaces();
                 const repositoryName = path.basename(folder); // Get the repository name from the folder
 
                 commandList.forEach(command => {
-                    const commandKey = `${repositoryName}:${command} --workspace sites`; // Added space here
+                    const commandKey = `${rootRepositoryName}:${command}`; // Updated commandKey format
                     if (!packageJson.scripts) {
                         packageJson.scripts = {};
                     }
 
                     // Modify the script command to use a relative path (./packages/*)
-                    packageJson.scripts[commandKey] = `npm run ${repositoryName}:${command} --workspace sites`;  // Added space here
+                    packageJson.scripts[commandKey] = `echo ${repositoryName}:${rootRepositoryName}:${command} works`;  // Adjusted echo format
                 });
 
                 fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
@@ -225,7 +238,7 @@ checkAndAddWorkspaces();
             const packageJson = require(rootPackageJsonPath);
 
             commands.forEach(command => {
-                packageJson.scripts[command] = `npm run ${prefix}:${command} --workspace sites`;  // Use relative path here
+                packageJson.scripts[command] = `npm run ${prefix}:${command} --workspace packages`;  // Updated workspace reference
             });
 
             // Adding workspaces to the root package.json
@@ -304,7 +317,7 @@ checkAndAddWorkspaces();
             updateRootPackageJson(commands, prefix);
 
             // Add commands to each package's package.json
-            addCommandsToPackageJson(commands);
+            addCommandsToPackageJson(commands, currentRepoName);
 
             // Log done for package.json modification
             log(chalk.green('🚛 Done modifying package.json files in root and packages.'));
