@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "rm -rf packages && node npm-workspacer.js"
+    "start": "rm -rf packages && node npm-workspacer.js",
+    "echo": "npm run npm-workspacer:echo -w /packages/*",
+    "delta": "npm run npm-workspacer:delta -w /packages/*",
+    "tango": "npm run npm-workspacer:tango -w /packages/*"
   },
   "keywords": [],
   "author": "",

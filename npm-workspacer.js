@@ -111,6 +111,38 @@ const createPackageJson = (folder) => {
     });
 };
 
+const promptForCommands = async () => {
+    let commands = '';
+    while (!commands) {
+        const response = await prompt({
+            type: 'input',
+            name: 'commands',
+            message: 'List the commands you would like to create, delimited by comma (e.g., build, test, deploy):',
+        });
+        commands = response.commands.trim();
+        if (!commands) {
+            console.log(chalk.red('🚛 promptForCommands :: No commands entered, please try again.'));
+        }
+    }
+    return commands.split(',').map(cmd => cmd.trim());
+};
+
+const updateRootPackageJson = (commands, prefix) => {
+    const rootPackageJsonPath = path.join(__dirname, 'package.json');
+    if (fs.existsSync(rootPackageJsonPath)) {
+        const packageJson = require(rootPackageJsonPath);
+
+        commands.forEach(command => {
+            packageJson.scripts[command] = `npm run ${prefix}:${command} -w /packages/*`;
+        });
+
+        fs.writeFileSync(rootPackageJsonPath, JSON.stringify(packageJson, null, 2));
+        console.log(chalk.green(`🚛 updateRootPackageJson :: Updated package.json with commands.`));
+    } else {
+        console.log(chalk.red('🚛 updateRootPackageJson :: root package.json not found.'));
+    }
+};
+
 (async () => {
     const githubUsername = await getGitHubUsername();
     if (!githubUsername) {
@@ -141,37 +173,41 @@ const createPackageJson = (folder) => {
                 await cloneRepository(url, targetDir);
             }
 
-            // Add a line break after all clones are done
-            console.log();  // This adds a line break
+            console.log();  // Line break after cloning
 
-            setTimeout(async () => {
-                const currentRepoName = path.basename(__dirname);
-                const prefix = await promptForPrefix(currentRepoName);
-                console.log(chalk.green(`🚛 promptForPrefix :: Selected prefix for commands: ${prefix}`));
+            const currentRepoName = path.basename(__dirname);
+            const prefix = await promptForPrefix(currentRepoName);
+            console.log(chalk.green(`🚛 promptForPrefix :: Selected prefix for commands: ${prefix}`));
 
-                const missingPackageJson = scanForMissingPackageJson();
+            const missingPackageJson = scanForMissingPackageJson();
 
-                if (missingPackageJson.length > 0) {
-                    const response = await prompt({
-                        type: 'confirm',
-                        name: 'createPackageJson',
-                        message: 'Some repositories are missing package.json files. Would you like to create them?',
+            if (missingPackageJson.length > 0) {
+                const response = await prompt({
+                    type: 'confirm',
+                    name: 'createPackageJson',
+                    message: 'Some repositories are missing package.json files. Would you like to create them?',
+                });
+
+                if (response.createPackageJson) {
+                    const { selectedFolders } = await prompt({
+                        type: 'multiselect',
+                        name: 'selectedFolders',
+                        message: 'Select the repositories to create package.json files for:',
+                        choices: missingPackageJson
                     });
 
-                    if (response.createPackageJson) {
-                        const { selectedFolders } = await prompt({
-                            type: 'multiselect',
-                            name: 'selectedFolders',
-                            message: 'Select the repositories to create package.json files for:',
-                            choices: missingPackageJson
-                        });
-
-                        selectedFolders.forEach((folder) => createPackageJson(folder));
-                    }
-                } else {
-                    console.log(chalk.green('🚛 createPackageJson :: All repositories already have a package.json file.'));
+                    selectedFolders.forEach((folder) => createPackageJson(folder));
                 }
-            }, 5000);
+            } else {
+                console.log(chalk.green('🚛 createPackageJson :: All repositories already have a package.json file.'));
+            }
+
+            // Prompt for the commands
+            const commands = await promptForCommands();
+
+            // Update the root package.json with the commands
+            updateRootPackageJson(commands, prefix);
+
         } else {
             console.log(chalk.red('🚲 fetchRepositories :: No repositories found for user.'));
         }
