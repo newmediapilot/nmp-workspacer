@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "bash npm-workspacer.sh"
+    "start": "chmod 777 npm-workspacer.sh && bash npm-workspacer.sh"
   },
   "keywords": [],
   "author": "",
