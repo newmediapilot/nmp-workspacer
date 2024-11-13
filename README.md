@@ -35,6 +35,9 @@
    ```bash
    npm run start
    ```
+## Commands
+
+- `npm run start`: Initializes the workspace, clones selected repositories, sets up `package.json` files, and updates the root `package.json` with commands.
 
 ### The `npm run start` script does the following:
 
@@ -67,53 +70,3 @@
 
 10. **Logs Success**.
     - Once the process is complete, the script logs success messages for each step, confirming that the repositories were cloned, the workspaces were set up, and the commands were added.
-
-## Commands
-
-- `npm run start`: Initializes the workspace, clones selected repositories, sets up `package.json` files, and updates the root `package.json` with commands.
-
-## How the Script Works (Step-by-Step)
-
-1. **Initialization and Cleanup**:
-   - The script first deletes the existing `packages/` directory and recreates it. This ensures a fresh start before cloning any repositories.
-
-2. **GitHub Username and Repository Selection**:
-   - The script prompts the user for a GitHub username and fetches the list of repositories associated with that username.
-   - You will be prompted to select the repositories you wish to clone. If no repositories are selected, the script exits.
-
-3. **Cloning Repositories**:
-   - The selected repositories are cloned into the `packages/` directory. If a repository already exists in the directory, the script updates it using `git fetch` and `git pull`.
-
-4. **Creating `package.json` Files**:
-   - The script checks whether each cloned repository has a `package.json`. If any are missing, the user is asked if they want to create them. If confirmed, `npm init -y` is run to generate the file.
-
-5. **Command Prefix and Workspace Setup**:
-   - The user is prompted to provide a prefix for commands (e.g., `root-repo:`), which will be used in both the root `package.json` and the individual package files.
-   - The script then prompts for a list of commands that should be added to the `package.json` files. It will add these commands in the form of `npm run root-repo:command --workspace packages`.
-
-6. **Updating `package.json`**:
-   - The root `package.json` is updated to include a `workspaces` field that points to the `packages/*` directory.
-   - The selected commands are added to the root `package.json` as well as each individual repository's `package.json`, with an `echo` statement that outputs success when the commands are run.
-
-7. **Completion**:
-   - After updating all `package.json` files, the script logs a success message indicating that everything is set up correctly.
-
-## Troubleshooting
-
-- **Error: `fs.rmdir` deprecated**: Ensure you're using Node.js version 14.14.0 or above. The script uses `fs.rmSync` instead of `fs.rmdir`, which is supported in newer Node versions.
-  
-- **Error: No Git username found**: Ensure that your Git configuration includes a valid username. You can set this using the following command:
-
-  ```bash
-  git config --global user.name "Your Name"
-  ```
-
-- **Command not recognized in `package.json`**: Make sure you have correctly followed the prompts and selected the commands to create in the workspace. You can verify the commands in both the root and repository `package.json` files.
-
-## Contributing
-
-Feel free to open issues and pull requests for improvements or bug fixes. Contributions are welcome!
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
