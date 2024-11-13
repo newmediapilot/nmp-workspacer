@@ -35,38 +35,69 @@
    ```bash
    npm run start
    ```
+
 ## Commands
 
 - `npm run start`: Initializes the workspace, clones selected repositories, sets up `package.json` files, and updates the root `package.json` with commands.
 
 ### The `npm run start` script does the following:
 
-1. **Deletes and recreates the `packages/` directory**.
+- **Deletes and recreates the `packages/` directory**:
    - If the `packages/` directory already exists, it will be deleted and recreated. This ensures a clean environment for the cloned repositories.
 
-2. **Prompts for GitHub Username**.
+- **Prompts for GitHub Username**:
    - The script will ask for your GitHub username (with a default value if you're already logged into Git). It uses this username to fetch a list of repositories from GitHub.
 
-3. **Fetches a List of Repositories from GitHub**.
+- **Fetches a List of Repositories from GitHub**:
    - The script will fetch a list of repositories associated with your GitHub account.
 
-4. **Prompts for Repository Selection**.
-   - You will be asked to select which repositories to clone. You can select multiple repositories or choose none.
+- **Prompts for Repository Selection**:
+   - You will be asked to select which repositories to clone. You can select multiple repositories.
 
-5. **Clones the Selected Repositories**.
+- **Clones the Selected Repositories**:
    - The repositories will be cloned into the `packages/` directory. If a repository already exists, it will be updated with `git fetch` and `git pull` to ensure the latest version.
 
-6. **Asks for a Command Prefix**.
+- **Asks for a Command Prefix**:
    - After cloning, you will be prompted to provide a prefix for the commands. This prefix will be used when defining workspace commands in the `package.json` files.
 
-7. **Checks and Creates `package.json` Files if Missing**.
+- **Checks and Creates `package.json` Files if Missing**:
    - The script checks whether each cloned repository has a `package.json` file. If not, it prompts you to create one for the repository.
 
-8. **Prompts for Workspace Commands**.
+- **Prompts for Workspace Commands**:
    - You will be asked to provide a list of commands (e.g., `build, test, deploy`) that you want to create for the root workspace. These commands are then added to the root `package.json` and the respective `package.json` files for each repository.
 
-9. **Updates Root `package.json` and Package `package.json` Files**.
+- **Updates Root `package.json` and Package `package.json` Files**:
    - The root `package.json` file is updated with workspace-specific commands and a `workspaces` field. Each repository's `package.json` is also updated with the corresponding command definitions.
 
-10. **Logs Success**.
+- **Logs Success**:
     - Once the process is complete, the script logs success messages for each step, confirming that the repositories were cloned, the workspaces were set up, and the commands were added.
+
+## Command Naming Example
+
+Let's say your root repository is called `root-repo` and you selected the following commands: `build`, `test`, and `deploy`. After running the script, your setup would look like this:
+
+### In the **root `package.json`**:
+```json
+{
+  "scripts": {
+    "build": "npm run root-repo:build --workspace packages",
+    "test": "npm run root-repo:test --workspace packages",
+    "deploy": "npm run root-repo:deploy --workspace packages"
+  }
+}
+```
+
+### In each **package's `package.json`**:
+```json
+{
+  "scripts": {
+    "root-repo:build": "echo package-name:root-repo:build works",
+    "root-repo:test": "echo package-name:root-repo:test works",
+    "root-repo:deploy": "echo package-name:root-repo:deploy works"
+  }
+}
+```
+
+### Explanation:
+- In the **root `package.json`**, the commands are prefixed with `root-repo` (the name of your root repository), followed by the command name, e.g., `root-repo:build`.
+- In the **individual repository `package.json`**, the script echoes a message indicating that the specific command has been executed in that repository.
