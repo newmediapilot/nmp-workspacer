@@ -51,7 +51,7 @@
    - The script will fetch a list of repositories associated with your GitHub account.
 
 4. **Prompts for Repository Selection**.
-   - You will be asked to select which repositories to clone. You can select multiple repositories or choose none.
+   - You will be asked to select which repositories to clone. You can select multiple repositories.
 
 5. **Clones the Selected Repositories**.
    - The repositories will be cloned into the `packages/` directory. If a repository already exists, it will be updated with `git fetch` and `git pull` to ensure the latest version.
