@@ -32,44 +32,40 @@ const deleteAndRecreatePackagesDir = () => {
 const getPackageFolders = () => {
     return new Promise((resolve, reject) => {
         const folders = fs.readdirSync(packagesDir).filter((file) => fs.statSync(path.join(packagesDir, file)).isDirectory());
-        resolve(folders.map(folder => `packages/${folder}`));
+        resolve(folders);
     });
 };
 
 // Function to check and add workspaces to root package.json
-const checkAndAddWorkspaces = () => {
-    return new Promise((resolve, reject) => {
-        try {
-            // Read the current root package.json
-            const packageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf-8'));
+const checkAndAddWorkspaces = async () => {
+    try {
+        // Read the current root package.json
+        const packageJson = JSON.parse(fs.readFileSync(rootPackageJsonPath, 'utf-8'));
 
-            // Check if the workspaces field exists
-            if (!packageJson.workspaces) {
-                log(chalk.yellow('🚛 workspaces not found in root package.json. Adding workspaces...'));
+        // Check if the workspaces field exists
+        if (!packageJson.workspaces) {
+            log(chalk.yellow('🚛 workspaces not found in root package.json. Adding workspaces...'));
 
-                // Get the list of package folders inside the packages/ directory
-                getPackageFolders().then(packageFolders => {
-                    // Add the workspaces field with the package folders
-                    packageJson.workspaces = packageFolders;
+            // Get the list of package folders inside the packages/ directory
+            const packageFolders = await getPackageFolders(); // Awaiting the promise here
 
-                    // Write the updated package.json back to disk
-                    fs.writeFileSync(rootPackageJsonPath, JSON.stringify(packageJson, null, 2));
-                    log(chalk.green('🚛 workspaces added to root package.json.'));
+            // Add the workspaces field with the package folders
+            packageJson.workspaces = packageFolders.map(folder => `packages/${folder}`);
 
-                    // Restart the script after adding the workspaces field
-                    log(chalk.blue('🚛 Restarting the script to apply changes...'));
-                    execSync('node ' + __filename, { stdio: 'inherit' });
-                    process.exit(); // Exit current process to allow restart
-                }).catch(reject);
-            } else {
-                log(chalk.green('🚛 workspaces already found in root package.json. Proceeding with the script...'));
-                resolve();
-            }
-        } catch (error) {
-            log(chalk.red(`🚛 Error checking or adding workspaces: ${error.message}`));
-            reject(error);
+            // Write the updated package.json back to disk
+            fs.writeFileSync(rootPackageJsonPath, JSON.stringify(packageJson, null, 2));
+            log(chalk.green('🚛 workspaces added to root package.json.'));
+
+            // Restart the script after adding the workspaces field
+            log(chalk.blue('🚛 Restarting the script to apply changes...'));
+            execSync('node ' + __filename, { stdio: 'inherit' });
+            process.exit(); // Exit current process to allow restart
+        } else {
+            log(chalk.green('🚛 workspaces already found in root package.json. Proceeding with the script...'));
         }
-    });
+    } catch (error) {
+        log(chalk.red(`🚛 Error checking or adding workspaces: ${error.message}`));
+    }
 };
 
 // Function to fetch repositories from GitHub
@@ -204,7 +200,7 @@ const addCommandsToPackageJson = (commandList, rootRepositoryName) => {
 };
 
 // Function to update the root package.json with new commands
-const updateRootPackageJson = (commands, prefix) => {
+const updateRootPackageJson = async (commands, prefix) => {
     const rootPackageJsonPath = path.join(__dirname, 'package.json');
     if (fs.existsSync(rootPackageJsonPath)) {
         const packageJson = require(rootPackageJsonPath);
@@ -213,14 +209,45 @@ const updateRootPackageJson = (commands, prefix) => {
             packageJson.scripts[command] = `npm run ${prefix}:${command} --workspace packages`;  // Updated workspace reference
         });
 
-        // Adding workspaces to the root package.json
-        packageJson.workspaces = getPackageFolders(); // Dynamically add workspaces based on available repositories
+        // Dynamically add workspaces to the root package.json based on available repositories
+        const workspaces = await getPackageFolders();
+        packageJson.workspaces = workspaces.map(folder => `packages/${folder}`);
 
         fs.writeFileSync(rootPackageJsonPath, JSON.stringify(packageJson, null, 2));
         log(chalk.green(`🚛 updateRootPackageJson :: Updated package.json with commands and workspaces.`));
     } else {
         log(chalk.red('🚛 updateRootPackageJson :: root package.json not found.'));
     }
+};
+
+// Function to prompt for the commands
+const promptForCommands = async () => {
+    let commands = '';
+    while (!commands) {
+        const response = await prompt({
+            type: 'input',
+            name: 'commands',
+            message: 'List the commands you would like to create, delimited by comma (e.g., build, test, deploy):',
+            initial: 'build, test, deploy'  // Set default value
+        });
+        commands = response.commands.trim();
+        if (!commands) {
+            log(chalk.red('🚛 promptForCommands :: No commands entered, please try again.'));
+        }
+    }
+    return commands.split(',').map(cmd => cmd.trim());
+};
+
+// Function to prompt for the prefix for commands
+const promptForPrefix = async (defaultPrefix) => {
+    const response = await prompt({
+        type: 'input',
+        name: 'prefix',
+        message: `What prefix should run commands have?`,
+        initial: defaultPrefix
+    });
+
+    return response.prefix || defaultPrefix;
 };
 
 // Main function to run all tasks
